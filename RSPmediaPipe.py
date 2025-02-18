@@ -15,7 +15,7 @@ rsp = {
 }
 
 # 동작 인식 모델 만들기 (knn모델)
-file = np.genfromtxt('./data/gesture_train.csv', delimiter=',')
+file = np.genfromtxt('./data/train_modified.csv', delimiter=',')
 X = file[:, :-1].astype(np.float32)
 y = file[:, -1].astype(np.float32)
 knn = KNeighborsClassifier(n_neighbors=3)

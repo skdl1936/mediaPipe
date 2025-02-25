@@ -15,7 +15,12 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.7 # 손 추적에 대한 최소 신뢰도 기준 (0.7 = 70 % 이상 확실해야 추적)
 )
 
-video = cv2.VideoCapture(0) #웹캠 열기 ( 외장 카메라는 1, 2 로 설정가능) 
+video = cv2.VideoCapture(0) #웹캠 열기 ( 외장 카메라는 1, 2 로 설정가능)
+
+if not video.isOpened():
+    print("카메라를 열 수 없습니다.")
+    exit()
+
 while video.isOpened(): # 웹캠이 정상적으로 열려 있는 동안 실행
     ret, img = video.read() # 카메라에서 프레임(이미지) 읽기
     img = cv2.flip(img,1) # 좌우 반전

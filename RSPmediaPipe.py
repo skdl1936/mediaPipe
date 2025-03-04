@@ -1,7 +1,7 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
+# from sklearn.neighbors import KNeighborsClassifier
 import time
 import random
 
@@ -45,11 +45,8 @@ print('com: ',computer_rsp)
 # 사용자 가위바위보 선택
 user_rsp = None
 
-video = cv2.VideoCapture(0) #웹캠 키기
 
-# 해상도 조절
-video.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-video.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+video = cv2.VideoCapture(0) #웹캠 키기
 
 
 while video.isOpened(): #웹캠이 켜져있는동안

@@ -1,11 +1,9 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-# from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import time
 import random
-import subprocess
-import shlex
 
 
 # 인식 가능한 11가지 동작
@@ -47,13 +45,29 @@ print('com: ',computer_rsp)
 # 사용자 가위바위보 선택
 user_rsp = None
 
-# 손 인식 후 랜드마크 표시( Mediapipe 손탐지 프로세스를 인자로 받음)
-def hand_landmarks(hands,img):
+video = cv2.VideoCapture(0) #웹캠 키기
+
+# 해상도 조절
+video.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+video.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+
+while video.isOpened(): #웹캠이 켜져있는동안
+    ret, img = video.read() # 한 프레임씩 읽어온다.
+    if not ret:
+        continue
+
+    img = cv2.flip(img, 1) #좌우 반전
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # BGR 변환
+    result = hands.process(img)  # 손 탐지하기
+
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
     # 찾은 손 표시하기
-    if hands.multi_hand_landmarks is not None: # 손 인식하면, 게임이 끝나지 않은 경우
+    if result.multi_hand_landmarks is not None: # 손 인식하면, 게임이 끝나지 않은 경우
 
         # 이미지 손 표현하기
-        for res in hands.multi_hand_landmarks:
+        for res in result.multi_hand_landmarks:
             joint = np.zeros((21, 3))  # 21개 관절, xyz값 저장할 배열 생성 -> 즉 21,3의 배열 생성
             # enumerate = for문의 순서 표현
             for j, lm in enumerate(res.landmark):
@@ -86,7 +100,7 @@ def hand_landmarks(hands,img):
 
             # 사용자가 낸 가위바위보 표시
             if idx in rps_gesture.keys():
-                # org = (int(res.landmark[0].x * img.shape[1]), int(res.landmark[0].y * img.shape[0]))
+                org = (int(res.landmark[0].x * img.shape[1]), int(res.landmark[0].y * img.shape[0]))
                 cv2.putText(img, text = rps_gesture[idx].upper(), org=(int(res.landmark[0].x * img.shape[1]),
                int(res.landmark[0].y * img.shape[0] + 20)), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale=1, color=(0, 0, 255), thickness=2)
@@ -98,10 +112,13 @@ def hand_landmarks(hands,img):
             # 손가락 마디마디에 랜드마크 그리기
             mp_drawing.draw_landmarks(img, res, mp_hands.HAND_CONNECTIONS)
 
-    return img
+    # # 사용자가 선택한 가위바위보 한 번만 저장
+    # if user_rsp is None and idx is not None:
+    #     user_rsp = rps_gesture[idx]
+    #     print('user: ', user_rsp)
+    #     idx = None
 
-# 가위바위보 게임 결과 도출 함수
-def rsp_game_result():
+    # 가위바위보 승자 결정
     result = None
     if computer_rsp == 'rock':
         if user_rsp == 'rock':
@@ -125,60 +142,28 @@ def rsp_game_result():
         elif user_rsp == 'scissors':
             result = 'DRAW'
 
-    return result
+    if result:
+        cv2.putText(img, text=result, org=(int(img.shape[1] / 2), 100), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=3, color=(0, 0, 255), thickness=5)
+        cv2.putText(img, text=f'computer: {computer_rsp}',
+                    org=(int(img.shape[1] / 2), 170),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 255, 0), thickness=2)
 
-# libcamera-vid 명령어 설정 (MJPEG 스트리밍)
-cmd = 'libcamera-vid --inline --nopreview -t 0 --codec mjpeg --width 640 --height 480 --framerate 15 -o - --camera 0'
+        #다른 제스쳐
+        # cv2.putText(img, text = gesture[idx].upper(), org=(int(res.landmark[0].x * img.shape[1]),
+        #             int(res.landmark[0].y * img.shape[0] + 20)), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+        #             fontScale=1, color=(0, 0, 255), thickness=2)
 
-# libcamera-vid 프로세스 실행
-process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-img = None
 
-try:
-    buffer = b""
+    cv2.imshow('Game', img) # 그림 만들기
+    if cv2.waitKey(1) == ord('q'):
+        break
 
-    while True: #웹캠이 켜져있는동안
-        buffer += process.stdout.read(256)
-        a = buffer.find(b'\xff\xd8')  # JPEG 시작 마커
-        b = buffer.find(b'\xff\xd9')  # JPEG 종료 마커
-        
-        if a != -1 and b != -1:
-            jpg = buffer[a:b+2]
-            buffer = buffer[b+2:]
-            
-            img = cv2.imdecode(np.frombuffer(jpg,dtype=np.uint8), cv2.IMREAD_COLOR)
-            if img is None:
-                continue
+    if cv2.waitKey(1) == ord('r'):  # 'r' 키를 누르면 게임 리셋
+        user_rsp = None
+        idx = None
+        computer_rsp = random.choice(['rock', 'paper', 'scissors'])  # 컴퓨터 선택도 다시 랜덤
+        print('com: ',computer_rsp)
 
-            img = cv2.flip(img, 1) #좌우 반전
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # BGR 변환
-            result = hands.process(img)  # 손 탐지하기
-
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-            #손 인식및 랜드마크 표시
-            hand_landmarks(result,img)
-
-        # 가위바위보 승자 결정
-        rsp_result = rsp_game_result()
-
-        # 결과 이미지로 출력
-        if rsp_result:
-            cv2.putText(img, text=rsp_result, org=(int(img.shape[1] / 2), 100), fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=3, color=(0, 0, 255), thickness=5)
-            cv2.putText(img, text=f'computer: {computer_rsp}',
-                        org=(int(img.shape[1] / 2), 170),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 255, 0), thickness=2)
-
-        cv2.imshow('Game', img) # 그림 만들기
-        if cv2.waitKey(1) == ord('q'):
-            break
-
-        if cv2.waitKey(1) == ord('r'):  # 'r' 키를 누르면 게임 리셋
-            user_rsp = None
-            idx = None
-            computer_rsp = random.choice(['rock', 'paper', 'scissors'])  # 컴퓨터 선택도 다시 랜덤
-            print('com: ',computer_rsp)
-finally:
-    process.terminate()
-    cv2.destroyAllWindows()
+video.release()
+cv2.destroyAllWindows()
